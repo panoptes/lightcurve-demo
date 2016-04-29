@@ -14,7 +14,7 @@ import seaborn
 import numpy as np
 import cv2
 
-Ui_MainWindow, QMainWindow = loadUiType('lc-demo.ui')
+Ui_MainWindow, QMainWindow = loadUiType('lightcurver.ui')
 
 
 class Main(QMainWindow, Ui_MainWindow):
@@ -34,16 +34,18 @@ class Main(QMainWindow, Ui_MainWindow):
         # UI callbacks
         self.start_button.clicked.connect(self.start_lightcurve)
         self.clear_button.clicked.connect(self.clear_lightcurve)
-        self.quit_button.clicked.connect(self.endCapture)
+        self.quit_button.clicked.connect(self.quit_application)
+        self.actionQuit.triggered.connect(self.quit_application)
         self.lc_interval.valueChanged.connect(self.update_interval)
         self._lc_value = self.lc_interval.value()
-
         self._lc_active = False
+
+        self._normal_factor = [1., 1., 1., ]
 
         self.fps_box.valueChanged.connect(self.update_webcam)
 
         # Setup webcam
-        self.capture = QtCapture(0, self.radius_slider, self.fps_box)
+        self.capture = QtCapture(0, self.radius_slider, self.fps_box, self.actionColors)
         self.capture.setParent(self)
         self.capture.setWindowFlags(QtCore.Qt.Tool)
 
@@ -63,9 +65,17 @@ class Main(QMainWindow, Ui_MainWindow):
         self._lc_range = np.arange(0, (self._lc_max_tick_num * self._lc_tick), self._lc_tick) / 1000.
         self._lc_data = np.zeros((3, self._lc_max_tick_num))
 
+##################################################################################################
+# Properties
+##################################################################################################
+
     @property
     def getting_lc(self):
         return self._lc_active
+
+##################################################################################################
+# Timers
+##################################################################################################
 
     def startCapture(self):
         if not self.capture:
@@ -77,24 +87,6 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture.show()
         self.start_webcam()
 
-    def update_webcam(self):
-        self.stop()
-        self.start()
-
-    def update_interval(self):
-        if not self.getting_lc:
-            # Store
-            lc_interval = self.lc_interval.value()
-            self._lc_value = lc_interval
-
-            # Update plot
-            self.ax1.set_xlim(0, lc_interval)
-
-    def endCapture(self):
-        self.capture.deleteLater()
-        self.capture = None
-        QtCore.QCoreApplication.instance().quit()
-
     def start_webcam(self):
         self.webcam_timer = QtCore.QTimer()
         self.webcam_timer.timeout.connect(self.webcam_callback)
@@ -102,11 +94,6 @@ class Main(QMainWindow, Ui_MainWindow):
 
     def stop_webcam(self):
         self.webcam_timer.stop()
-
-    def webcam_callback(self):
-        # Capture next webcam frame
-        self.img_data = self.capture.get_frame()
-        self.plot_values(self.img_data)
 
     def start_lightcurve(self):
         self._lc_active = True
@@ -131,6 +118,28 @@ class Main(QMainWindow, Ui_MainWindow):
         self.lc_timer.stop()
         self.clear_button.setEnabled(True)
 
+    def quit_application(self):
+        self._delete_later()
+        self.capture = None
+        QtCore.QCoreApplication.instance().quit()
+
+##################################################################################################
+# UI Methods
+##################################################################################################
+
+    def update_webcam(self):
+        self.stop()
+        self.start()
+
+    def update_interval(self):
+        if not self.getting_lc:
+            # Store
+            lc_interval = self.lc_interval.value()
+            self._lc_value = lc_interval
+
+            # Update plot
+            self.ax1.set_xlim(0, lc_interval)
+
     def clear_lightcurve(self):
         self._lc_active = False
 
@@ -153,6 +162,15 @@ class Main(QMainWindow, Ui_MainWindow):
         del self.g_line
         del self.b_line
 
+##################################################################################################
+# Action Methods
+##################################################################################################
+
+    def webcam_callback(self):
+        # Capture next webcam frame
+        self.img_data = self.capture.get_frame()
+        self.plot_values(self.img_data)
+
     def lightcurve_callback(self):
         # Which second we are on
         self._lc_sec = np.floor((self._lc_tick_num * self._lc_tick) / 1000.)
@@ -168,34 +186,66 @@ class Main(QMainWindow, Ui_MainWindow):
             # Update plot values
             self.plot_values(self.img_data)
 
-    def deleteLater(self):
-        self.capture.cap.release()
-        super(QtGui.QWidget, self.capture).deleteLater()
-
     def plot_values(self, masked_data):
-        center_r = masked_data[:, :, 0].mean()
-        center_g = masked_data[:, :, 1].mean()
-        center_b = masked_data[:, :, 2].mean()
 
-        color_max = max(center_r, center_g, center_b)
+        if not self.actionColors.isChecked():
+            self._plot_gray(masked_data)
+        else:
+            self._plot_color(masked_data)
 
-        r_mean = center_r / color_max * 100.
-        g_mean = center_g / color_max * 100.
-        b_mean = center_b / color_max * 100.
+##################################################################################################
+# Private Methods
+##################################################################################################
+
+    def _plot_gray(self, masked_data):
 
         if not self.getting_lc:
             self.ax1.clear()
             self._plot_init()
 
-            self.ax1.axhline(r_mean, color='r', ls='dashed')
-            self.ax1.axhline(g_mean, color='g', ls='dashed')
-            self.ax1.axhline(b_mean, color='b', ls='dashed')
+            self.ax1.axhline(100., color='k', ls='dashed')
+
+            # Store the normalization
+            self._normal_factor[0] = masked_data.sum()
         else:
             if self.lc_timer.isActive():
 
-                self._lc_data[0, self._lc_tick_num] = r_mean
-                self._lc_data[1, self._lc_tick_num] = g_mean
-                self._lc_data[2, self._lc_tick_num] = b_mean
+                light_value = masked_data.sum() / self._normal_factor[0] * 100.
+
+                self._lc_data[0, self._lc_tick_num] = light_value
+
+                if not hasattr(self, 'r_line'):
+                    self.r_line, = self.ax1.plot(self._lc_range, self._lc_data[0], 'o', color='k')
+                else:
+                    self.r_line.set_data(self._lc_range, self._lc_data[0])
+
+        self.fig1.canvas.draw()
+
+    def _plot_color(self, masked_data):
+
+        r_sum = masked_data[:, :, 0].sum()
+        g_sum = masked_data[:, :, 1].sum()
+        b_sum = masked_data[:, :, 2].sum()
+
+        if not self.getting_lc:
+            self.ax1.clear()
+            self._plot_init()
+
+            self.ax1.axhline(100., color='r', ls='dashed')
+            self.ax1.axhline(100., color='g', ls='dashed')
+            self.ax1.axhline(100., color='b', ls='dashed')
+
+            self._normal_factor = [r_sum, g_sum, b_sum]
+        else:
+            if self.lc_timer.isActive():
+
+                r_value = r_sum / self._normal_factor[0] * 100.
+                g_value = g_sum / self._normal_factor[1] * 100.
+                b_value = b_sum / self._normal_factor[2] * 100.
+
+                self._lc_data[0, self._lc_tick_num] = r_value
+                self._lc_data[1, self._lc_tick_num] = g_value
+                self._lc_data[2, self._lc_tick_num] = b_value
 
                 if not hasattr(self, 'r_line'):
                     self.r_line, = self.ax1.plot(self._lc_range, self._lc_data[0], color='r')
@@ -219,9 +269,12 @@ class Main(QMainWindow, Ui_MainWindow):
 
         self.fig1.tight_layout()
 
+    def _delete_later(self):
+        self.capture.cap.release()
+
 
 class QtCapture(QtGui.QWidget):
-    def __init__(self, vid_num, radius_slider, fps_box):
+    def __init__(self, vid_num, radius_slider, fps_box, actionColors):
         super(QtGui.QWidget, self).__init__()
 
         self.cap = cv2.VideoCapture(vid_num)
@@ -237,6 +290,7 @@ class QtCapture(QtGui.QWidget):
 
         self._radius_slider = radius_slider
         self._fps_box = fps_box
+        self.actionColors = actionColors
 
     @property
     def radius(self):
@@ -249,7 +303,6 @@ class QtCapture(QtGui.QWidget):
     def get_frame(self):
         ret, frame = self.cap.read()
 
-        # My webcam yields frames in BGR format
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
         # Create circular mask
@@ -260,9 +313,15 @@ class QtCapture(QtGui.QWidget):
 
         # Show image in window
         show_img = masked_data
+
         img = QtGui.QImage(show_img, show_img.shape[1], show_img.shape[0], QtGui.QImage.Format_RGB888)
         pix = QtGui.QPixmap.fromImage(img)
         self.video_frame.setPixmap(pix)
+
+        # If grayscale, convert frame before returning
+        if not self.actionColors.isChecked():
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            masked_data = cv2.bitwise_and(frame, frame, mask=circle_img)
 
         return masked_data
 
