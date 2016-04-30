@@ -127,7 +127,7 @@ class Main(QMainWindow, Ui_MainWindow):
             self.stop_webcam()
             img_data = cv2.imread(self._image_path)
             img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
-            self.capture.set_image(img_data)
+            self.capture._set_image(img_data)
 
             text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
             if ok:
@@ -308,7 +308,7 @@ class Main(QMainWindow, Ui_MainWindow):
         # self.ax1.set_autoscale_on(False)
 
         self.ax1.set_xlim(0, self._lc_value)
-        self.ax1.set_ylim(50., 110.)
+        self.ax1.set_ylim(50., 105.)
         self.ax1.set_xlabel("Time [s]")
         self.ax1.set_ylabel("Light [\%]")
 
@@ -360,7 +360,7 @@ class QtCapture(QtGui.QWidget):
         masked_data = cv2.bitwise_and(frame, frame, mask=circle_img)
 
         # Show image in window
-        self.set_image(masked_data)
+        self._set_image(masked_data)
 
         # If grayscale, convert frame before returning
         if not self.actionColors.isChecked():
@@ -369,7 +369,7 @@ class QtCapture(QtGui.QWidget):
 
         return masked_data
 
-    def set_image(self, img_data):
+    def _set_image(self, img_data):
         img = QtGui.QImage(img_data, img_data.shape[1], img_data.shape[0], QtGui.QImage.Format_RGB888)
         pix = QtGui.QPixmap.fromImage(img)
         self.video_frame.setPixmap(pix)
