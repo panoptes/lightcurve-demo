@@ -1,5 +1,6 @@
 import os
 import datetime as dt
+import copy
 
 from PyQt4.uic import loadUiType
 from PyQt4 import QtGui, QtCore
@@ -146,6 +147,10 @@ class Main(QMainWindow, Ui_MainWindow):
         self.seconds_label.setEnabled(True)
 
         self._image_saved = False
+
+        if os.path.exists(self._image_path):
+            os.unlink(self._image_path)
+
         self._image_path = ''
         self._lc_sec = 0.
 
