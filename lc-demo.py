@@ -51,6 +51,7 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture.setWindowFlags(QtCore.Qt.Tool)
 
         self._image_saved = False
+        self._image_path = None
 
         self.webcamLayout.addWidget(self.capture)
 
@@ -121,28 +122,6 @@ class Main(QMainWindow, Ui_MainWindow):
         self.lc_timer.stop()
         self.clear_button.setEnabled(True)
 
-    def quit_application(self):
-        self._delete_later()
-        self.capture = None
-        QtCore.QCoreApplication.instance().quit()
-
-##################################################################################################
-# UI Methods
-##################################################################################################
-
-    def update_webcam(self):
-        self.stop()
-        self.start()
-
-    def update_interval(self):
-        if not self.getting_lc:
-            # Store
-            lc_interval = self.lc_interval.value()
-            self._lc_value = lc_interval
-
-            # Update plot
-            self.ax1.set_xlim(0, lc_interval)
-
     def clear_lightcurve(self):
         self._lc_active = False
 
@@ -161,6 +140,7 @@ class Main(QMainWindow, Ui_MainWindow):
         self.seconds_label.setEnabled(True)
 
         self._image_saved = False
+        self._image_path = None
         self._lc_sec = 0.
 
         # Clear plot lines
@@ -168,6 +148,7 @@ class Main(QMainWindow, Ui_MainWindow):
         del self.r_line
         del self.g_line
         del self.b_line
+
 
 ##################################################################################################
 # Action Methods
@@ -209,6 +190,27 @@ class Main(QMainWindow, Ui_MainWindow):
         else:
             self._plot_gray(masked_data)
 
+##################################################################################################
+# UI Methods
+##################################################################################################
+
+    def update_webcam(self):
+        self.stop()
+        self.start()
+
+    def update_interval(self):
+        if not self.getting_lc:
+            # Store
+            lc_interval = self.lc_interval.value()
+            self._lc_value = lc_interval
+
+            # Update plot
+            self.ax1.set_xlim(0, lc_interval)
+
+    def quit_application(self):
+        self._delete_later()
+        self.capture = None
+        QtCore.QCoreApplication.instance().quit()
 
 ##################################################################################################
 # Private Methods
