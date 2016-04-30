@@ -1,5 +1,6 @@
 import argparse
 import time
+import datetime as dt
 
 from PyQt4.uic import loadUiType
 from PyQt4 import QtGui, QtCore
@@ -48,6 +49,8 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture = QtCapture(0, self.radius_slider, self.fps_box, self.actionColors)
         self.capture.setParent(self)
         self.capture.setWindowFlags(QtCore.Qt.Tool)
+
+        self._image_saved = False
 
         self.webcamLayout.addWidget(self.capture)
 
@@ -157,6 +160,9 @@ class Main(QMainWindow, Ui_MainWindow):
         self.radius_label.setEnabled(True)
         self.seconds_label.setEnabled(True)
 
+        self._image_saved = False
+        self._lc_sec = 0.
+
         # Clear plot lines
         del self.gray_line
         del self.r_line
@@ -168,8 +174,17 @@ class Main(QMainWindow, Ui_MainWindow):
 ##################################################################################################
 
     def webcam_callback(self):
+        save_frame = False
+
+        if self.actionSave_Pics.isChecked() and \
+                not self._image_saved \
+                and hasattr(self, '_lc_sec') \
+                and self._lc_sec > self._lc_value / 2:
+            save_frame = True
+            self._image_saved = True
+
         # Capture next webcam frame
-        self.img_data = self.capture.get_frame()
+        self.img_data = self.capture.get_frame(save_frame=save_frame)
         self.plot_values(self.img_data)
 
     def lightcurve_callback(self):
@@ -304,8 +319,11 @@ class QtCapture(QtGui.QWidget):
     def fps(self):
         return self._fps_box.value()
 
-    def get_frame(self):
+    def get_frame(self, save_frame=False):
         ret, frame = self.cap.read()
+
+        if save_frame:
+            cv2.imwrite("/var/panoptes/images/webcam/{}.png".format(dt.datetime.now().isoformat()), frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
