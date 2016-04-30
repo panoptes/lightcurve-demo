@@ -1,5 +1,4 @@
-import argparse
-import time
+import os
 import datetime as dt
 
 from PyQt4.uic import loadUiType
@@ -51,7 +50,7 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture.setWindowFlags(QtCore.Qt.Tool)
 
         self._image_saved = False
-        self._image_path = None
+        self._image_path = ''
 
         self.webcamLayout.addWidget(self.capture)
 
@@ -122,6 +121,13 @@ class Main(QMainWindow, Ui_MainWindow):
         self.lc_timer.stop()
         self.clear_button.setEnabled(True)
 
+        # If we have a pic, show it
+        if os.path.exists(self._image_path):
+            self.stop_webcam()
+            img_data = cv2.imread(self._image_path)
+            img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
+            self.capture.set_image(img_data)
+
     def clear_lightcurve(self):
         self._lc_active = False
 
@@ -140,14 +146,19 @@ class Main(QMainWindow, Ui_MainWindow):
         self.seconds_label.setEnabled(True)
 
         self._image_saved = False
-        self._image_path = None
+        self._image_path = ''
         self._lc_sec = 0.
 
         # Clear plot lines
-        del self.gray_line
-        del self.r_line
-        del self.g_line
-        del self.b_line
+        try:
+            del self.gray_line
+            del self.r_line
+            del self.g_line
+            del self.b_line
+        except:
+            pass
+
+        self.start_webcam()
 
 
 ##################################################################################################
@@ -155,17 +166,15 @@ class Main(QMainWindow, Ui_MainWindow):
 ##################################################################################################
 
     def webcam_callback(self):
-        save_frame = False
-
         if self.actionSave_Pics.isChecked() and \
                 not self._image_saved \
                 and hasattr(self, '_lc_sec') \
                 and self._lc_sec > self._lc_value / 2:
-            save_frame = True
+            self._image_path = "/var/panoptes/images/webcam/{}.png".format(dt.datetime.now().isoformat())
             self._image_saved = True
 
         # Capture next webcam frame
-        self.img_data = self.capture.get_frame(save_frame=save_frame)
+        self.img_data = self.capture.get_frame(save_frame=self._image_path)
         self.plot_values(self.img_data)
 
     def lightcurve_callback(self):
@@ -321,11 +330,11 @@ class QtCapture(QtGui.QWidget):
     def fps(self):
         return self._fps_box.value()
 
-    def get_frame(self, save_frame=False):
+    def get_frame(self, save_frame=''):
         ret, frame = self.cap.read()
 
-        if save_frame:
-            cv2.imwrite("/var/panoptes/images/webcam/{}.png".format(dt.datetime.now().isoformat()), frame)
+        if save_frame is not '':
+            cv2.imwrite(save_frame, frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -336,11 +345,7 @@ class QtCapture(QtGui.QWidget):
         masked_data = cv2.bitwise_and(frame, frame, mask=circle_img)
 
         # Show image in window
-        show_img = masked_data
-
-        img = QtGui.QImage(show_img, show_img.shape[1], show_img.shape[0], QtGui.QImage.Format_RGB888)
-        pix = QtGui.QPixmap.fromImage(img)
-        self.video_frame.setPixmap(pix)
+        self.set_image(masked_data)
 
         # If grayscale, convert frame before returning
         if not self.actionColors.isChecked():
@@ -348,6 +353,11 @@ class QtCapture(QtGui.QWidget):
             masked_data = cv2.bitwise_and(frame, frame, mask=circle_img)
 
         return masked_data
+
+    def set_image(self, img_data):
+        img = QtGui.QImage(img_data, img_data.shape[1], img_data.shape[0], QtGui.QImage.Format_RGB888)
+        pix = QtGui.QPixmap.fromImage(img)
+        self.video_frame.setPixmap(pix)
 
 
 if __name__ == '__main__':
