@@ -158,6 +158,7 @@ class Main(QMainWindow, Ui_MainWindow):
         self.seconds_label.setEnabled(True)
 
         # Clear plot lines
+        del self.gray_line
         del self.r_line
         del self.g_line
         del self.b_line
@@ -188,10 +189,11 @@ class Main(QMainWindow, Ui_MainWindow):
 
     def plot_values(self, masked_data):
 
-        if not self.actionColors.isChecked():
-            self._plot_gray(masked_data)
-        else:
+        if self.actionColors.isChecked():
             self._plot_color(masked_data)
+        else:
+            self._plot_gray(masked_data)
+
 
 ##################################################################################################
 # Private Methods
@@ -214,10 +216,12 @@ class Main(QMainWindow, Ui_MainWindow):
 
                 self._lc_data[0, self._lc_tick_num] = light_value
 
-                if not hasattr(self, 'r_line'):
-                    self.r_line, = self.ax1.plot(self._lc_range, self._lc_data[0], 'o', color='k')
+                if not hasattr(self, 'gray_line'):
+                    self.gray_line, = self.ax1.plot(self._lc_range, self._lc_data[0], 'o', color='gray')
+                    self.gray_marker, = self.ax1.plot(self._lc_tick_num, color='gray')
                 else:
-                    self.r_line.set_data(self._lc_range, self._lc_data[0])
+                    self.gray_line.set_data(self._lc_range, self._lc_data[0])
+                    self.gray_marker.set_data(self._lc_range, self._lc_data[0])
 
         self.fig1.canvas.draw()
 
