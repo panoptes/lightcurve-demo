@@ -123,11 +123,21 @@ class Main(QMainWindow, Ui_MainWindow):
         self.clear_button.setEnabled(True)
 
         # If we have a pic, show it
-        if os.path.exists(self._image_path):
+        if self.actionSave_Pics and os.path.exists(self._image_path):
             self.stop_webcam()
             img_data = cv2.imread(self._image_path)
             img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
             self.capture.set_image(img_data)
+
+            text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
+            if not ok:
+                # Remove image
+                os.unlink(self._image_path)
+            else:
+                if text:
+                    os.rename(self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
+
+            self.clear_lightcurve()
 
     def clear_lightcurve(self):
         self._lc_active = False
@@ -147,9 +157,6 @@ class Main(QMainWindow, Ui_MainWindow):
         self.seconds_label.setEnabled(True)
 
         self._image_saved = False
-
-        if os.path.exists(self._image_path):
-            os.unlink(self._image_path)
 
         self._image_path = ''
         self._lc_sec = 0.
