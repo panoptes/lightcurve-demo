@@ -130,12 +130,15 @@ class Main(QMainWindow, Ui_MainWindow):
             self.capture.set_image(img_data)
 
             text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
-            if not ok:
-                # Remove image
-                os.unlink(self._image_path)
-            else:
+            if ok:
                 if text:
                     os.rename(self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
+                    self.fig1.savefig('/var/panoptes/images/webcam/{}_plot.png'.format(text))
+                else:
+                    self.fig1.savefig('{}_plot.png'.format(self._image_path))
+            else:
+                # Remove image
+                os.unlink(self._image_path)
 
             self.clear_lightcurve()
 
