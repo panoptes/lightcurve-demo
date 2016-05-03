@@ -1,20 +1,22 @@
 import os
 import datetime as dt
-import copy
 
 from PyQt4.uic import loadUiType
 from PyQt4 import QtGui, QtCore
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import (FigureCanvasQTAgg as FigureCanvas)
-from matplotlib.patches import Circle, Wedge, Polygon
-from matplotlib.collections import PatchCollection
+
 
 import seaborn
 
 import numpy as np
 import cv2
 
+# Make pretty
+seaborn.set()
+
+# Load our UI file created in designer
 Ui_MainWindow, QMainWindow = loadUiType('lightcurver.ui')
 
 
