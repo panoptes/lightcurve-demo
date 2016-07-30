@@ -277,6 +277,9 @@
    </property>
   </action>
   <action name="actionLoop_Mode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>Loop Mode</string>
    </property>

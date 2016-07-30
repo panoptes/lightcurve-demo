@@ -60,7 +60,7 @@ class Main(QMainWindow, Ui_MainWindow):
         self.setWindowTitle('LightCurve Demo')
         self.canvas.draw()
         self.show()
-        self.startCapture()
+        self.start_application()
 
     def reset_data(self):
         self._lc_value = self.lc_interval.value()
@@ -83,11 +83,10 @@ class Main(QMainWindow, Ui_MainWindow):
 # Timers
 ##################################################################################################
 
-    def startCapture(self):
+    def start_application(self):
         if not self.capture:
             self.capture = QtCapture(0)
             self.stop_button.clicked.connect(self.capture.stop)
-            # self.capture.setFPS(1)
             self.capture.setParent(self)
             self.capture.setWindowFlags(QtCore.Qt.Tool)
         self.capture.show()
@@ -120,51 +119,53 @@ class Main(QMainWindow, Ui_MainWindow):
         self.radius_label.setDisabled(True)
         self.seconds_label.setDisabled(True)
 
+        # If loop mode
+        if self.actionLoop_Mode.isChecked():
+            # Change start button to stop button
+            self.clear_button.setEnabled(True)
+            self.clear_button.setText('&Stop')
+
+        self.show()
+
     def stop_lightcurve(self):
         self.lc_timer.stop()
-        self.clear_button.setEnabled(True)
 
-        # If we have a pic, show it
-        if self.actionSave_Pics and os.path.exists(self._image_path):
-            self.stop_webcam()
-            img_data = cv2.imread(self._image_path)
-            img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
-            self.capture._set_image(img_data)
-
-            text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
-            if ok:
-                if text:
-                    os.rename(self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
-                    self.fig1.savefig('/var/panoptes/images/webcam/{}_plot.png'.format(text))
-                else:
-                    self.fig1.savefig('{}_plot.png'.format(self._image_path))
-            else:
-                # Remove image
-                os.unlink(self._image_path)
-
+        if self.actionLoop_Mode.isChecked():
             self.clear_lightcurve()
+            self.start_lightcurve()
+        else:
+            self.clear_button.setEnabled(True)
+
+            # If we have a pic, show it
+            if self.actionSave_Pics and os.path.exists(self._image_path):
+                self.stop_webcam()
+                img_data = cv2.imread(self._image_path)
+                img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
+                self.capture._set_image(img_data)
+
+                text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
+                if ok:
+                    if text:
+                        os.rename(self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
+                        self.fig1.savefig('/var/panoptes/images/webcam/{}_plot.png'.format(text))
+                    else:
+                        self.fig1.savefig('{}_plot.png'.format(self._image_path))
+                else:
+                    # Remove image
+                    os.unlink(self._image_path)
+
+                self.clear_lightcurve()
 
     def clear_lightcurve(self):
         self._lc_active = False
-
-        # UI enable
-        self.start_button.setEnabled(True)
-        self.fps_box.setEnabled(True)
-        self.radius_slider.setEnabled(True)
-
-        self.clear_button.setDisabled(True)
-
-        self.lc_interval.setEnabled(True)
-        self.lc_interval.setValue(self._lc_value)
-
-        self.fps_label.setEnabled(True)
-        self.radius_label.setEnabled(True)
-        self.seconds_label.setEnabled(True)
 
         self._image_saved = False
 
         self._image_path = ''
         self._lc_sec = 0.
+
+        # Reset timer
+        self.lc_interval.setValue(self._lc_value)
 
         # Clear plot lines
         try:
@@ -175,7 +176,21 @@ class Main(QMainWindow, Ui_MainWindow):
         except:
             pass
 
-        self.start_webcam()
+        if not self.actionLoop_Mode.isChecked():
+            # UI enable
+            self.start_button.setEnabled(True)
+            self.fps_box.setEnabled(True)
+            self.radius_slider.setEnabled(True)
+
+            self.clear_button.setDisabled(True)
+
+            self.lc_interval.setEnabled(True)
+
+            self.fps_label.setEnabled(True)
+            self.radius_label.setEnabled(True)
+            self.seconds_label.setEnabled(True)
+
+            self.start_webcam()
 
 
 ##################################################################################################
