@@ -1,27 +1,25 @@
 import os
 import datetime as dt
 
-from PyQt4.uic import loadUiType
-from PyQt4 import QtGui, QtCore
+from PyQt5.uic import loadUiType
+from PyQt5 import QtGui, QtCore
+from PyQt5 import QtWidgets
 
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt4agg import (FigureCanvasQTAgg as FigureCanvas)
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg as FigureCanvas)
 
-
-import seaborn
 
 import numpy as np
 import cv2
-
-# Make pretty
-seaborn.set()
 
 # Load our UI file created in designer
 Ui_MainWindow, QMainWindow = loadUiType('lightcurver.ui')
 
 
 class Main(QMainWindow, Ui_MainWindow):
-    def __init__(self):
+
+    def __init__(self, video_device=0):
         super(Main, self).__init__()
         self.setupUi(self)
 
@@ -48,7 +46,8 @@ class Main(QMainWindow, Ui_MainWindow):
         self.fps_box.valueChanged.connect(self.update_webcam)
 
         # Setup webcam
-        self.capture = QtCapture(0, self.radius_slider, self.fps_box, self.actionColors)
+        self.capture = QtCapture(
+            video_device, self.radius_slider, self.fps_box, self.actionColors)
         self.capture.setParent(self)
         self.capture.setWindowFlags(QtCore.Qt.Tool)
 
@@ -68,20 +67,21 @@ class Main(QMainWindow, Ui_MainWindow):
         self._lc_tick = 1000. / self.fps_box.value()
         self._lc_max_tick_num = int((self._lc_value * 1000.) / self._lc_tick)
 
-        self._lc_range = np.arange(0, (self._lc_max_tick_num * self._lc_tick), self._lc_tick) / 1000.
+        self._lc_range = np.arange(
+            0, (self._lc_max_tick_num * self._lc_tick), self._lc_tick) / 1000.
         self._lc_data = np.zeros((3, self._lc_max_tick_num))
 
-##################################################################################################
+##########################################################################
 # Properties
-##################################################################################################
+##########################################################################
 
     @property
     def getting_lc(self):
         return self._lc_active
 
-##################################################################################################
+##########################################################################
 # Timers
-##################################################################################################
+##########################################################################
 
     def start_application(self):
         if not self.capture:
@@ -143,13 +143,17 @@ class Main(QMainWindow, Ui_MainWindow):
                 img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
                 self.capture._set_image(img_data)
 
-                text, ok = QtGui.QInputDialog.getText(self, 'Save Image?', 'Email Address')
+                text, ok = QtGui.QInputDialog.getText(
+                    self, 'Save Image?', 'Email Address')
                 if ok:
                     if text:
-                        os.rename(self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
-                        self.fig1.savefig('/var/panoptes/images/webcam/{}_plot.png'.format(text))
+                        os.rename(
+                            self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
+                        self.fig1.savefig(
+                            '/var/panoptes/images/webcam/{}_plot.png'.format(text))
                     else:
-                        self.fig1.savefig('{}_plot.png'.format(self._image_path))
+                        self.fig1.savefig(
+                            '{}_plot.png'.format(self._image_path))
                 else:
                     # Remove image
                     os.unlink(self._image_path)
@@ -173,7 +177,7 @@ class Main(QMainWindow, Ui_MainWindow):
             del self.r_line
             del self.g_line
             del self.b_line
-        except:
+        except Exception:
             pass
 
         if not self.actionLoop_Mode.isChecked():
@@ -193,16 +197,17 @@ class Main(QMainWindow, Ui_MainWindow):
             self.start_webcam()
 
 
-##################################################################################################
+##########################################################################
 # Action Methods
-##################################################################################################
+##########################################################################
 
     def webcam_callback(self):
         if self.actionSave_Pics.isChecked() and \
                 not self._image_saved \
                 and hasattr(self, '_lc_sec') \
                 and self._lc_sec > self._lc_value / 2:
-            self._image_path = "/var/panoptes/images/webcam/{}.png".format(dt.datetime.now().isoformat())
+            self._image_path = "/var/panoptes/images/webcam/{}.png".format(
+                dt.datetime.now().isoformat())
             self._image_saved = True
 
         # Capture next webcam frame
@@ -231,9 +236,9 @@ class Main(QMainWindow, Ui_MainWindow):
         else:
             self._plot_gray(masked_data)
 
-##################################################################################################
+##########################################################################
 # UI Methods
-##################################################################################################
+##########################################################################
 
     def update_webcam(self):
         self.stop()
@@ -253,9 +258,9 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture = None
         QtCore.QCoreApplication.instance().quit()
 
-##################################################################################################
+##########################################################################
 # Private Methods
-##################################################################################################
+##########################################################################
 
     def _plot_gray(self, masked_data):
 
@@ -275,8 +280,10 @@ class Main(QMainWindow, Ui_MainWindow):
                 self._lc_data[0, self._lc_tick_num] = light_value
 
                 if not hasattr(self, 'gray_line'):
-                    self.gray_line, = self.ax1.plot(self._lc_range, self._lc_data[0], 'o', color='gray')
-                    self.gray_marker, = self.ax1.plot(self._lc_tick_num, color='gray')
+                    self.gray_line, = self.ax1.plot(
+                        self._lc_range, self._lc_data[0], 'o', color='gray')
+                    self.gray_marker, = self.ax1.plot(
+                        self._lc_tick_num, color='gray')
                 else:
                     self.gray_line.set_data(self._lc_range, self._lc_data[0])
                     self.gray_marker.set_data(self._lc_range, self._lc_data[0])
@@ -310,9 +317,12 @@ class Main(QMainWindow, Ui_MainWindow):
                 self._lc_data[2, self._lc_tick_num] = b_value
 
                 if not hasattr(self, 'r_line'):
-                    self.r_line, = self.ax1.plot(self._lc_range, self._lc_data[0], color='r')
-                    self.g_line, = self.ax1.plot(self._lc_range, self._lc_data[1], color='g')
-                    self.b_line, = self.ax1.plot(self._lc_range, self._lc_data[2], color='b')
+                    self.r_line, = self.ax1.plot(
+                        self._lc_range, self._lc_data[0], color='r')
+                    self.g_line, = self.ax1.plot(
+                        self._lc_range, self._lc_data[1], color='g')
+                    self.b_line, = self.ax1.plot(
+                        self._lc_range, self._lc_data[2], color='b')
                 else:
                     self.r_line.set_data(self._lc_range, self._lc_data[0])
                     self.g_line.set_data(self._lc_range, self._lc_data[1])
@@ -335,19 +345,25 @@ class Main(QMainWindow, Ui_MainWindow):
         self.capture.cap.release()
 
 
-class QtCapture(QtGui.QWidget):
+class QtCapture(QtWidgets.QWidget):
+
     def __init__(self, vid_num, radius_slider, fps_box, actionColors):
-        super(QtGui.QWidget, self).__init__()
+        super(QtWidgets.QWidget, self).__init__()
 
-        self.cap = cv2.VideoCapture(vid_num)
+        self.cap = cv2.VideoCapture()
 
-        self.video_frame = QtGui.QLabel()
-        lay = QtGui.QVBoxLayout()
-        lay.setMargin(0)
+        if self.cap.open(vid_num) is False:
+            raise Exception("Can't attach to video")
+
+        self.video_frame = QtWidgets.QLabel()
+        lay = QtWidgets.QVBoxLayout()
+        # lay.setMargin(0)
         lay.addWidget(self.video_frame)
         self.setLayout(lay)
 
         ret, frame = self.cap.read()
+        print(ret)
+        print(frame)
         self.height, self.width, self.depth = frame.shape
 
         self._radius_slider = radius_slider
@@ -372,7 +388,8 @@ class QtCapture(QtGui.QWidget):
 
         # Create circular mask
         circle_img = np.zeros((self.height, self.width), np.uint8)
-        cv2.circle(circle_img, (int(self.width / 2), int(self.height / 2)), int(self.radius), 1, -1)
+        cv2.circle(circle_img, (int(self.width / 2),
+                                int(self.height / 2)), int(self.radius), 1, -1)
 
         masked_data = cv2.bitwise_and(frame, frame, mask=circle_img)
 
@@ -387,15 +404,23 @@ class QtCapture(QtGui.QWidget):
         return masked_data
 
     def _set_image(self, img_data):
-        img = QtGui.QImage(img_data, img_data.shape[1], img_data.shape[0], QtGui.QImage.Format_RGB888)
+        img = QtGui.QImage(img_data, img_data.shape[1], img_data.shape[
+                           0], QtGui.QImage.Format_RGB888)
         pix = QtGui.QPixmap.fromImage(img)
         self.video_frame.setPixmap(pix)
 
 
 if __name__ == '__main__':
     import sys
+    import argparse
 
-    app = QtGui.QApplication(sys.argv)
-    main = Main()
+    parser = argparse.ArgumentParser(description='Light-curve demo')
+    parser.add_argument('--device', type=int, default=0,
+                        help='Video device to use, e.g. 0 for /dev/video0, 1 for /dev/video1')
+
+    args = parser.parse_args()
+
+    app = QtWidgets.QApplication(sys.argv)
+    main = Main(video_device=args.device)
     main.show()
     sys.exit(app.exec_())
