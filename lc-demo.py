@@ -45,7 +45,7 @@ class Main(QMainWindow, Ui_MainWindow):
 
         self._normal_factor = [1., 1., 1., ]
 
-        self.fps_box.valueChanged.connect(self.update_webcam)
+        # self.fps_box.valueChanged.connect(self.update_webcam)
 
         # Setup webcam
         self.capture = QtCapture(
@@ -97,7 +97,7 @@ class Main(QMainWindow, Ui_MainWindow):
     def start_webcam(self):
         self.webcam_timer = QtCore.QTimer()
         self.webcam_timer.timeout.connect(self.webcam_callback)
-        self.webcam_timer.start(1000. / self.fps_box.value())
+        self.webcam_timer.start(40)
 
     def stop_webcam(self):
         self.webcam_timer.stop()
@@ -145,14 +145,14 @@ class Main(QMainWindow, Ui_MainWindow):
                 img_data = cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB)
                 self.capture._set_image(img_data)
 
-                text, ok = QtGui.QInputDialog.getText(
+                text, ok = QtWidgets.QInputDialog.getText(
                     self, 'Save Image?', 'Email Address')
                 if ok:
                     if text:
                         os.rename(
-                            self._image_path, '/var/panoptes/images/webcam/{}.png'.format(text))
+                            self._image_path, '/home/panoptes/Pictures/{}.png'.format(text))
                         self.fig1.savefig(
-                            '/var/panoptes/images/webcam/{}_plot.png'.format(text))
+                            '/home/panoptes/Pictures/{}_plot.png'.format(text))
                     else:
                         self.fig1.savefig(
                             '{}_plot.png'.format(self._image_path))
@@ -208,7 +208,7 @@ class Main(QMainWindow, Ui_MainWindow):
                 not self._image_saved \
                 and hasattr(self, '_lc_sec') \
                 and self._lc_sec > self._lc_value / 2:
-            self._image_path = "/var/panoptes/images/webcam/{}.png".format(
+            self._image_path = "/home/panoptes/Pictures/{}.png".format(
                 dt.datetime.now().isoformat())
             self._image_saved = True
 
@@ -364,8 +364,8 @@ class QtCapture(QtWidgets.QWidget):
         self.setLayout(lay)
 
         ret, frame = self.cap.read()
-        #print(ret)
-        #print(frame)
+        # print(ret)
+        # print(frame)
         self.height, self.width, self.depth = frame.shape
 
         self._radius_slider = radius_slider
