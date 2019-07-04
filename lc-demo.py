@@ -364,8 +364,8 @@ class QtCapture(QtWidgets.QWidget):
         self.setLayout(lay)
 
         ret, frame = self.cap.read()
-        print(ret)
-        print(frame)
+        #print(ret)
+        #print(frame)
         self.height, self.width, self.depth = frame.shape
 
         self._radius_slider = radius_slider
