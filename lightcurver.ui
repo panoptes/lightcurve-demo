@@ -116,26 +116,6 @@
        </spacer>
       </item>
       <item>
-       <widget class="QLabel" name="fps_label">
-        <property name="text">
-         <string>FPS:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QSpinBox" name="fps_box">
-        <property name="minimum">
-         <number>1</number>
-        </property>
-        <property name="maximum">
-         <number>30</number>
-        </property>
-        <property name="value">
-         <number>12</number>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QLabel" name="radius_label">
         <property name="text">
          <string>Star Size:</string>
@@ -190,7 +170,14 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
-     <layout class="QVBoxLayout" name="webcamLayout"/>
+     <property name="autoFillBackground">
+      <bool>true</bool>
+     </property>
+     <layout class="QVBoxLayout" name="webcamLayout">
+      <property name="sizeConstraint">
+       <enum>QLayout::SetNoConstraint</enum>
+      </property>
+     </layout>
     </widget>
     <widget class="QWidget" name="horizontalLayoutWidget">
      <property name="geometry">
@@ -219,7 +206,7 @@
      <x>0</x>
      <y>0</y>
      <width>887</width>
-     <height>25</height>
+     <height>20</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

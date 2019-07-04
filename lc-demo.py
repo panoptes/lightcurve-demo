@@ -23,6 +23,7 @@ class Main(QMainWindow, Ui_MainWindow):
 
     def __init__(self, video_device=0):
         super(Main, self).__init__()
+        # self.showMaximized()
         self.setupUi(self)
 
         self.reset_data()
@@ -45,11 +46,9 @@ class Main(QMainWindow, Ui_MainWindow):
 
         self._normal_factor = [1., 1., 1., ]
 
-        # self.fps_box.valueChanged.connect(self.update_webcam)
-
         # Setup webcam
         self.capture = QtCapture(
-            video_device, self.radius_slider, self.fps_box, self.actionColors)
+            video_device, self.radius_slider, self.actionColors)
         self.capture.setParent(self)
         self.capture.setWindowFlags(QtCore.Qt.Tool)
 
@@ -66,7 +65,7 @@ class Main(QMainWindow, Ui_MainWindow):
     def reset_data(self):
         self._lc_value = self.lc_interval.value()
         self._lc_tick_num = 0
-        self._lc_tick = 1000. / self.fps_box.value()
+        self._lc_tick = 40
         self._lc_max_tick_num = int((self._lc_value * 1000.) / self._lc_tick)
 
         self._lc_range = np.arange(
@@ -115,9 +114,7 @@ class Main(QMainWindow, Ui_MainWindow):
         # UI disable
         self.start_button.setDisabled(True)
         self.lc_interval.setDisabled(True)
-        self.fps_box.setDisabled(True)
         self.radius_slider.setDisabled(True)
-        self.fps_label.setDisabled(True)
         self.radius_label.setDisabled(True)
         self.seconds_label.setDisabled(True)
 
@@ -185,14 +182,12 @@ class Main(QMainWindow, Ui_MainWindow):
         if not self.actionLoop_Mode.isChecked():
             # UI enable
             self.start_button.setEnabled(True)
-            self.fps_box.setEnabled(True)
             self.radius_slider.setEnabled(True)
 
             self.clear_button.setDisabled(True)
 
             self.lc_interval.setEnabled(True)
 
-            self.fps_label.setEnabled(True)
             self.radius_label.setEnabled(True)
             self.seconds_label.setEnabled(True)
 
@@ -349,36 +344,30 @@ class Main(QMainWindow, Ui_MainWindow):
 
 class QtCapture(QtWidgets.QWidget):
 
-    def __init__(self, vid_num, radius_slider, fps_box, actionColors):
+    def __init__(self, vid_num, radius_slider, actionColors):
         super(QtWidgets.QWidget, self).__init__()
 
         self.cap = cv2.VideoCapture()
+        # self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 160)
+        # self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 120)
 
         if self.cap.open(vid_num) is False:
             raise Exception("Can't attach to video")
 
         self.video_frame = QtWidgets.QLabel()
         lay = QtWidgets.QVBoxLayout()
-        # lay.setMargin(0)
         lay.addWidget(self.video_frame)
         self.setLayout(lay)
 
         ret, frame = self.cap.read()
-        # print(ret)
-        # print(frame)
         self.height, self.width, self.depth = frame.shape
 
         self._radius_slider = radius_slider
-        self._fps_box = fps_box
         self.actionColors = actionColors
 
     @property
     def radius(self):
         return self._radius_slider.value()
-
-    @property
-    def fps(self):
-        return self._fps_box.value()
 
     def get_frame(self, save_frame=''):
         ret, frame = self.cap.read()
