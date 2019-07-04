@@ -305,9 +305,11 @@ class Main(QMainWindow, Ui_MainWindow):
         else:
             if self.lc_timer.isActive():
 
-                r_value = r_sum / self._normal_factor[0] * 100.
-                g_value = g_sum / self._normal_factor[1] * 100.
-                b_value = b_sum / self._normal_factor[2] * 100.
+                r_value = min((r_sum / self._normal_factor[0]) * 100., 100)
+                g_value = min((g_sum / self._normal_factor[1]) * 100., 100)
+                b_value = min((b_sum / self._normal_factor[2]) * 100., 100)
+
+                print(r_value, g_value, b_value)
 
                 self._lc_data[0, self._lc_tick_num] = r_value
                 self._lc_data[1, self._lc_tick_num] = g_value
