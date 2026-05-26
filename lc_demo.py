@@ -5,10 +5,17 @@ Point a webcam at a light source, click Start, and move a dark object in
 front of the light to see a real-time lightcurve appear in your browser.
 """
 
+import io
+from datetime import UTC, datetime
+
 import cv2
+import matplotlib
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
+
+matplotlib.use("Agg")
+from matplotlib import pyplot as plt
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -41,6 +48,7 @@ def _init_state() -> None:
         "video_device": 0,
         "frame_rgb": None,  # latest raw RGB frame
         "masked_rgb": None,  # latest masked RGB frame (for display)
+        "frame_at_midpoint": None,  # RGB numpy array captured at midpoint for snapshot
         "image_bytes": None,  # PNG bytes for download button
         "lc_fig": None,  # current Plotly figure
     }
@@ -55,6 +63,7 @@ def _reset_lc() -> None:
     st.session_state.tick_num = 0
     st.session_state.lc_data = np.zeros((3, max_ticks))
     st.session_state.normal_factor = [1.0, 1.0, 1.0]
+    st.session_state.frame_at_midpoint = None
     st.session_state.image_bytes = None
     st.session_state.lc_fig = None
 
@@ -211,6 +220,110 @@ def _build_figure(
     return fig
 
 
+def _build_composite_image(
+    frame_rgb: np.ndarray,
+    lc_data: np.ndarray,
+    max_ticks: int,
+    lc_value: int,
+    use_color: bool,
+    zoom_yaxis: bool,
+) -> bytes:
+    """Compose a shareable PNG: webcam midpoint frame + full lightcurve + timestamp."""
+    bg = "#0e1117"
+    fg = "#fafafa"
+    panel_bg = "#1a1d27"
+
+    fig = plt.figure(figsize=(14, 6.5), facecolor=bg)
+    gs = fig.add_gridspec(
+        2,
+        2,
+        height_ratios=[0.10, 0.90],
+        width_ratios=[1, 1.6],
+        hspace=0.06,
+        wspace=0.10,
+        left=0.04,
+        right=0.97,
+        top=0.93,
+        bottom=0.10,
+    )
+
+    # Header — title and timestamp
+    ax_hdr = fig.add_subplot(gs[0, :])
+    ax_hdr.set_facecolor(bg)
+    ax_hdr.axis("off")
+    ts = datetime.now(UTC).strftime("%d %B %Y — %H:%M UTC")
+    ax_hdr.text(
+        0.5,
+        0.5,
+        f"PANOPTES Lightcurve Demo   •   {ts}",
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontweight="bold",
+        color=fg,
+        transform=ax_hdr.transAxes,
+    )
+
+    # Webcam panel
+    ax_cam = fig.add_subplot(gs[1, 0])
+    ax_cam.set_facecolor(panel_bg)
+    ax_cam.imshow(frame_rgb)
+    ax_cam.set_title("Webcam (midpoint)", color=fg, fontsize=11, pad=6)
+    ax_cam.set_xticks([])
+    ax_cam.set_yticks([])
+    for spine in ax_cam.spines.values():
+        spine.set_edgecolor("#444444")
+
+    # Lightcurve panel
+    ax_lc = fig.add_subplot(gs[1, 1])
+    ax_lc.set_facecolor(panel_bg)
+    t = np.arange(max_ticks) * TICK_S
+
+    if use_color:
+        palette = [("#ef553b", "R"), ("#00cc96", "G"), ("#636efa", "B")]
+        for i, (color, label) in enumerate(palette):
+            ax_lc.plot(t, lc_data[i], color=color, linewidth=2, label=label)
+        ax_lc.legend(
+            loc="lower left",
+            facecolor=panel_bg,
+            edgecolor="#444444",
+            labelcolor=fg,
+            fontsize=9,
+        )
+    else:
+        ax_lc.plot(t, lc_data[0], color="#aaaaaa", linewidth=2, label="Flux")
+
+    ax_lc.axhline(NORM_MAX, linestyle="--", color="#666666", linewidth=1, alpha=0.7)
+    ax_lc.set_ylim(50 if zoom_yaxis else 0, 105)
+    ax_lc.set_xlim(0, lc_value)
+    ax_lc.set_xlabel("Time [s]", color=fg, fontsize=10)
+    ax_lc.set_ylabel("Light [%]", color=fg, fontsize=10)
+    ax_lc.set_title("Lightcurve", color=fg, fontsize=11, pad=6)
+    ax_lc.tick_params(colors=fg)
+    ax_lc.xaxis.label.set_color(fg)
+    ax_lc.yaxis.label.set_color(fg)
+    for spine in ax_lc.spines.values():
+        spine.set_edgecolor("#444444")
+
+    # Footer tagline
+    fig.text(
+        0.5,
+        0.02,
+        "You just observed a stellar transit!  ★  panoptes.org",
+        ha="center",
+        va="bottom",
+        fontsize=11,
+        color="#aaaaaa",
+        style="italic",
+    )
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", facecolor=bg, dpi=120)
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()
+
+
 # ---------------------------------------------------------------------------
 # Live view fragment
 # ---------------------------------------------------------------------------
@@ -258,15 +371,11 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
             if tick == 0:
                 factor = [r if r > 0 else 1.0, g if g > 0 else 1.0, b if b > 0 else 1.0]
                 st.session_state.normal_factor = factor
-                if save_image:
-                    _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
-                    st.session_state.image_bytes = enc.tobytes()
 
-            # Midpoint snapshot
+            # Midpoint — store webcam frame for the composite snapshot
             mid = max_ticks // 2
             if save_image and tick == mid:
-                _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
-                st.session_state.image_bytes = enc.tobytes()
+                st.session_state.frame_at_midpoint = display
 
             nr, ng, nb = _normalise(r, g, b, st.session_state.normal_factor)
             lc[0, tick] = nr
@@ -283,9 +392,17 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
 
             if st.session_state.tick_num >= max_ticks:
                 st.session_state.lc_active = False
-                st.session_state.lc_fig = _build_figure(
-                    lc, max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
-                )
+                lc_fig = _build_figure(lc, max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis)
+                st.session_state.lc_fig = lc_fig
+                if save_image and st.session_state.frame_at_midpoint is not None:
+                    st.session_state.image_bytes = _build_composite_image(
+                        st.session_state.frame_at_midpoint,
+                        lc,
+                        max_ticks,
+                        lc_value,
+                        use_color,
+                        zoom_yaxis,
+                    )
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
