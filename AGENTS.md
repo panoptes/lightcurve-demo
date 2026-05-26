@@ -44,6 +44,20 @@ The app opens at http://localhost:8501.
 
 ---
 
+## Running tests
+
+```bash
+uv run pytest -v                   # run all tests with coverage report
+uv run pytest -v --no-cov          # skip coverage (faster)
+uv run pytest tests/test_lc_demo.py::TestNormalise  # run one class
+```
+
+Coverage is reported to the terminal and written to `htmlcov/` (open `htmlcov/index.html` in a browser).
+
+The testable surface is the pure-Python business logic: `_measure_flux`, `_normalise`, `_build_figure`, and `_get_frame`. Streamlit session-state functions (`_init_state`, `_reset_lc`, `_open_camera`, `_release_camera`) and `main()` require a live Streamlit context and are covered by manual/integration testing only.
+
+---
+
 ## Linting and formatting
 
 ```bash

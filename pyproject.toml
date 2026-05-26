@@ -30,7 +30,26 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=lc_demo --cov-report=term-missing --cov-report=html:htmlcov"
+
+[tool.coverage.run]
+source = ["lc_demo"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "def main",          # Streamlit entrypoint — tested via integration only
+]
+
 [dependency-groups]
 dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.14",
 ]

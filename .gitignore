@@ -19,8 +19,10 @@ env/
 # uv
 .uv/
 
-# Streamlit
-.streamlit/secrets.toml
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
 
 # Jupyter
 .ipynb_checkpoints/
