@@ -308,7 +308,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     cap = _open_camera(st.session_state.video_device)
     display, photometry = _get_frame(cap, radius, use_color)
-    cam_placeholder.image(display, channels="RGB", use_container_width=True)
+    cam_placeholder.image(display, channels="RGB", width="stretch")
 
     # ------------------------------------------------------------------
     # Lightcurve logic
@@ -316,6 +316,11 @@ def main() -> None:
     max_ticks = int((lc_value * 1000) / TICK_MS)
 
     if st.session_state.lc_active:
+        # Pin max_ticks to the array allocated at recording start so that
+        # changing the duration slider mid-recording cannot cause an IndexError.
+        lc = st.session_state.lc_data
+        max_ticks = lc.shape[1]
+
         tick = st.session_state.tick_num
         r, g, b = _measure_flux(photometry, use_color)
 
@@ -337,14 +342,13 @@ def main() -> None:
 
         nr, ng, nb = _normalise(r, g, b, st.session_state.normal_factor)
 
-        lc = st.session_state.lc_data
         lc[0, tick] = nr
         lc[1, tick] = ng
         lc[2, tick] = nb
 
         # Build and display figure
         fig = _build_figure(lc, max_ticks, lc_value, use_color)
-        lc_placeholder.plotly_chart(fig, use_container_width=True, key=f"lc_{tick}")
+        lc_placeholder.plotly_chart(fig, width="stretch", key=f"lc_{tick}")
 
         st.session_state.tick_num += 1
 
@@ -358,14 +362,14 @@ def main() -> None:
             st.rerun()
 
     else:
-        # Idle — show last figure or empty axes
+        # Idle — keep the webcam live and show last figure or empty axes
         if st.session_state.lc_fig is not None:
-            lc_placeholder.plotly_chart(
-                st.session_state.lc_fig, use_container_width=True, key="lc_final"
-            )
+            lc_placeholder.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_final")
         else:
             empty_fig = _build_figure(np.zeros((3, max_ticks)), max_ticks, lc_value, use_color)
-            lc_placeholder.plotly_chart(empty_fig, use_container_width=True, key="lc_empty")
+            lc_placeholder.plotly_chart(empty_fig, width="stretch", key="lc_empty")
+        time.sleep(TICK_S)
+        st.rerun()
 
 
 if __name__ == "__main__":
