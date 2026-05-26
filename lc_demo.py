@@ -385,6 +385,9 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
             fig = _build_figure(
                 lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1, zoom_yaxis=zoom_yaxis
             )
+            # Keep lc_fig in sync every tick so the else-branch always has
+            # the latest chart to display (guards against fragment timing quirks).
+            st.session_state.lc_fig = fig
             st.plotly_chart(fig, width="stretch", key="lc_chart")
 
             st.session_state.tick_num += 1
@@ -517,7 +520,7 @@ def main() -> None:
             clear_pressed = st.button(
                 "✕ Clear",
                 use_container_width=True,
-                disabled=not st.session_state.lc_active and st.session_state.lc_fig is None,
+                disabled=st.session_state.lc_active or st.session_state.lc_fig is None,
             )
 
         if start_pressed and not st.session_state.lc_active:
