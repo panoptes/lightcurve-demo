@@ -333,9 +333,13 @@ def main() -> None:
                 if st.session_state.lc_active:
                     st.session_state.lc_active = False
                     _reset_lc()
+                # Force a full rerun so the sidebar re-renders with the correct button.
+                st.rerun()
         else:
             if st.button("📷 Start Video", use_container_width=True):
                 st.session_state.video_active = True
+                # Force a full rerun so the sidebar re-renders with the correct button.
+                st.rerun()
 
         # Device picker — collapsed in a popover to keep sidebar clean
         device_label = f"📷 Device: /dev/video{st.session_state.video_device}"
