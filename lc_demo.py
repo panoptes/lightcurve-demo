@@ -529,10 +529,12 @@ def main() -> None:
         if start_pressed and not st.session_state.lc_active:
             _reset_lc()
             st.session_state.lc_active = True
-            # Force a full rerun so the sidebar re-renders with the Start button
-            # disabled.  Without this, lc_active is set True *after* the button
-            # has already been rendered as enabled in the current script run.
-            st.rerun()
+            # No st.rerun() here: the button click already triggered a full script
+            # rerun.  Calling st.rerun() a second time would abort this run before
+            # _live_view() is reached, causing the fragment to be re-mounted cold
+            # while its 100 ms auto-rerun timer may fire concurrently — that race
+            # is what blanks the chart.  Execution continues below to _live_view()
+            # which renders the chart immediately in this same rerun.
 
         if clear_pressed:
             st.session_state.lc_active = False
