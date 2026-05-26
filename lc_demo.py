@@ -201,7 +201,7 @@ def _build_figure(
     fig.update_layout(
         xaxis_title="Time [s]",
         yaxis_title="Light [%]",
-        yaxis={"range": [50, 105]},
+        yaxis={"range": [0, 105]},
         xaxis={"range": [0, lc_value]},
         margin={"l": 50, "r": 20, "t": 20, "b": 50},
         legend={"orientation": "h", "y": 1.05},
