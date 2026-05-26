@@ -381,21 +381,17 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
             lc[1, tick] = ng
             lc[2, tick] = nb
 
-            # Plot only the filled portion so the chart grows in real time.
-            fig = _build_figure(
+            # Update lc_fig with the filled portion so the chart grows in real time.
+            # Rendering is done unconditionally below so the widget always occupies
+            # the same position in the fragment's element tree.
+            st.session_state.lc_fig = _build_figure(
                 lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1, zoom_yaxis=zoom_yaxis
             )
-            # Keep lc_fig in sync every tick so the else-branch always has
-            # the latest chart to display (guards against fragment timing quirks).
-            st.session_state.lc_fig = fig
-            st.plotly_chart(fig, width="stretch", key="lc_chart")
 
             st.session_state.tick_num += 1
 
             if st.session_state.tick_num >= max_ticks:
                 st.session_state.lc_active = False
-                lc_fig = _build_figure(lc, max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis)
-                st.session_state.lc_fig = lc_fig
                 if save_image and st.session_state.frame_at_midpoint is not None:
                     st.session_state.image_bytes = _build_composite_image(
                         st.session_state.frame_at_midpoint,
@@ -407,22 +403,24 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
+        # Always render the chart at the same structural position regardless of
+        # recording state — this prevents Streamlit losing track of the widget
+        # when transitioning between the recording and idle branches.
+        if st.session_state.lc_fig is not None:
+            st.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_chart")
         else:
-            if st.session_state.lc_fig is not None:
-                st.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_chart")
-            else:
-                empty_fig = _build_figure(
-                    np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
-                )
-                st.plotly_chart(empty_fig, width="stretch", key="lc_chart")
+            empty_fig = _build_figure(
+                np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
+            )
+            st.plotly_chart(empty_fig, width="stretch", key="lc_chart")
 
-            if st.session_state.image_bytes is not None:
-                st.download_button(
-                    label="⬇ Download snapshot",
-                    data=st.session_state.image_bytes,
-                    file_name="lightcurve_snapshot.png",
-                    mime="image/png",
-                )
+        if st.session_state.image_bytes is not None:
+            st.download_button(
+                label="⬇ Download snapshot",
+                data=st.session_state.image_bytes,
+                file_name="lightcurve_snapshot.png",
+                mime="image/png",
+            )
 
 
 # ---------------------------------------------------------------------------
