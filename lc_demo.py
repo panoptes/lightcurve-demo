@@ -6,7 +6,7 @@ front of the light to see a real-time lightcurve appear in your browser.
 """
 
 import io
-from datetime import UTC, datetime
+from datetime import datetime
 
 import cv2
 import matplotlib
@@ -226,7 +226,6 @@ def _build_composite_image(
     max_ticks: int,
     lc_value: int,
     use_color: bool,
-    zoom_yaxis: bool,
 ) -> bytes:
     """Compose a shareable PNG: webcam midpoint frame + full lightcurve + timestamp."""
     bg = "#0e1117"
@@ -251,7 +250,7 @@ def _build_composite_image(
     ax_hdr = fig.add_subplot(gs[0, :])
     ax_hdr.set_facecolor(bg)
     ax_hdr.axis("off")
-    ts = datetime.now(UTC).strftime("%d %B %Y — %H:%M UTC")
+    ts = datetime.now().strftime("%d %B %Y — %H:%M")
     ax_hdr.text(
         0.5,
         0.5,
@@ -294,7 +293,7 @@ def _build_composite_image(
         ax_lc.plot(t, lc_data[0], color="#aaaaaa", linewidth=2, label="Flux")
 
     ax_lc.axhline(NORM_MAX, linestyle="--", color="#666666", linewidth=1, alpha=0.7)
-    ax_lc.set_ylim(50 if zoom_yaxis else 0, 105)
+    ax_lc.autoscale(axis="y")
     ax_lc.set_xlim(0, lc_value)
     ax_lc.set_xlabel("Time [s]", color=fg, fontsize=10)
     ax_lc.set_ylabel("Light [%]", color=fg, fontsize=10)
@@ -309,7 +308,7 @@ def _build_composite_image(
     fig.text(
         0.5,
         0.02,
-        "You just observed a stellar transit!  ★  panoptes.org",
+        "You just observed a stellar transit!  ★  projectpanoptes.org",
         ha="center",
         va="bottom",
         fontsize=11,
@@ -401,7 +400,6 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
                         max_ticks,
                         lc_value,
                         use_color,
-                        zoom_yaxis,
                     )
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
