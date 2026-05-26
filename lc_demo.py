@@ -160,6 +160,7 @@ def _build_figure(
     lc_value: int,
     use_color: bool,
     filled_ticks: int | None = None,
+    zoom_yaxis: bool = True,
 ) -> go.Figure:
     """Build a Plotly figure from the current lightcurve data.
 
@@ -201,7 +202,7 @@ def _build_figure(
     fig.update_layout(
         xaxis_title="Time [s]",
         yaxis_title="Light [%]",
-        yaxis={"range": [0, 105]},
+        yaxis={"range": [50, 105] if zoom_yaxis else [0, 105]},
         xaxis={"range": [0, lc_value]},
         margin={"l": 50, "r": 20, "t": 20, "b": 50},
         legend={"orientation": "h", "y": 1.05},
@@ -216,7 +217,7 @@ def _build_figure(
 
 
 @st.fragment(run_every=TICK_S)
-def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
+def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool) -> None:
     """Camera acquisition and lightcurve display, auto-refreshed every TICK_S.
 
     Running as a fragment means only this portion of the DOM is re-rendered
@@ -273,14 +274,14 @@ def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
             lc[2, tick] = nb
 
             # Plot only the filled portion so the chart grows in real time.
-            fig = _build_figure(lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1)
+            fig = _build_figure(lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1, zoom_yaxis=zoom_yaxis)
             st.plotly_chart(fig, width="stretch", key="lc_chart")
 
             st.session_state.tick_num += 1
 
             if st.session_state.tick_num >= max_ticks:
                 st.session_state.lc_active = False
-                st.session_state.lc_fig = _build_figure(lc, max_ticks, lc_value, use_color)
+                st.session_state.lc_fig = _build_figure(lc, max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis)
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
@@ -288,7 +289,7 @@ def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
             if st.session_state.lc_fig is not None:
                 st.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_chart")
             else:
-                empty_fig = _build_figure(np.zeros((3, max_ticks)), max_ticks, lc_value, use_color)
+                empty_fig = _build_figure(np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis)
                 st.plotly_chart(empty_fig, width="stretch", key="lc_chart")
 
             if st.session_state.image_bytes is not None:
@@ -378,6 +379,8 @@ def main() -> None:
 
         use_color = st.toggle("Show colour channels", value=True)
 
+        zoom_yaxis = st.toggle("Zoom Y-axis (50–100%)", value=True)
+
         save_image = st.toggle("Save snapshot at midpoint", value=False)
 
         st.divider()
@@ -393,7 +396,7 @@ def main() -> None:
             clear_pressed = st.button(
                 "✕ Clear",
                 use_container_width=True,
-                disabled=not st.session_state.lc_active,
+                disabled=not st.session_state.lc_active and st.session_state.lc_fig is None,
             )
 
         if start_pressed and not st.session_state.lc_active:
@@ -408,7 +411,7 @@ def main() -> None:
             st.session_state.lc_active = False
             _reset_lc()
 
-    _live_view(radius=radius, use_color=use_color, save_image=save_image)
+    _live_view(radius=radius, use_color=use_color, save_image=save_image, zoom_yaxis=zoom_yaxis)
 
 
 if __name__ == "__main__":
