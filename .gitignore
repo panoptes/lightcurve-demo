@@ -18,7 +18,6 @@ env/
 
 # uv
 .uv/
-uv.lock
 
 # Streamlit
 .streamlit/secrets.toml

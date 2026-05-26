@@ -5,18 +5,12 @@ Point a webcam at a light source, click Start, and move a dark object in
 front of the light to see a real-time lightcurve appear in your browser.
 """
 
-from __future__ import annotations
-
 import time
-from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-
-if TYPE_CHECKING:
-    pass
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -24,6 +18,9 @@ if TYPE_CHECKING:
 TICK_MS: int = 40  # update interval in milliseconds (~25 fps)
 TICK_S: float = TICK_MS / 1000.0
 NORM_MAX: float = 100.0  # normalised light value at baseline
+
+# Python 3.12 type aliases
+type FluxTriple = tuple[float, float, float]
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +30,7 @@ NORM_MAX: float = 100.0  # normalised light value at baseline
 
 def _init_state() -> None:
     """Initialise all session-state keys on first run."""
-    defaults: dict = {
+    defaults: dict[str, object] = {
         "lc_active": False,
         "lc_value": 10,  # total duration (seconds)
         "tick_num": 0,
@@ -128,7 +125,7 @@ def _get_frame(
 # ---------------------------------------------------------------------------
 
 
-def _measure_flux(photometry: np.ndarray, use_color: bool) -> tuple[float, float, float]:
+def _measure_flux(photometry: np.ndarray, use_color: bool) -> FluxTriple:
     """Return (r, g, b) flux sums.  All three are equal for greyscale."""
     if use_color:
         r = float(photometry[:, :, 0].sum())
@@ -140,7 +137,7 @@ def _measure_flux(photometry: np.ndarray, use_color: bool) -> tuple[float, float
     return r, g, b
 
 
-def _normalise(r: float, g: float, b: float, factor: list[float]) -> tuple[float, float, float]:
+def _normalise(r: float, g: float, b: float, factor: list[float]) -> FluxTriple:
     """Normalise flux values to baseline=100, clamped at 100."""
 
     def safe_div(val: float, ref: float) -> float:

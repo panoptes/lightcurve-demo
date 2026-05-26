@@ -1,0 +1,15 @@
+[server]
+# Disable the "deploy" button and other cloud-oriented UI for exhibit use
+headless = true
+
+[browser]
+# Don't open a new browser tab automatically when running locally
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#FFD700"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#1e2530"
+textColor = "#ffffff"
+font = "sans serif"
