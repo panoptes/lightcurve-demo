@@ -353,6 +353,16 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
     with col_lc:
         st.subheader("Lightcurve")
 
+        # Reserve fixed DOM slots upfront so the element tree never changes shape
+        # regardless of recording state or which toggles are active.  Streamlit
+        # fragment reconciliation is sensitive to structural position changes;
+        # locking every dynamic element into its own st.empty() slot prevents the
+        # chart from flickering or disappearing when the caption or download button
+        # appears/disappears.
+        caption_slot = st.empty()
+        chart_slot = st.empty()
+        download_slot = st.empty()
+
         if st.session_state.lc_active and photometry is not None:
             # Pin max_ticks to the array allocated at recording start so that
             # changing the duration slider mid-recording cannot cause an IndexError.
@@ -362,7 +372,7 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
 
             elapsed = tick * TICK_S
             remaining = max(0.0, lc_value - elapsed)
-            st.caption(f"Recording… {remaining:.1f}s remaining")
+            caption_slot.caption(f"Recording… {remaining:.1f}s remaining")
 
             r, g, b = _measure_flux(photometry, use_color)
 
@@ -381,9 +391,6 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
             lc[1, tick] = ng
             lc[2, tick] = nb
 
-            # Update lc_fig with the filled portion so the chart grows in real time.
-            # Rendering is done unconditionally below so the widget always occupies
-            # the same position in the fragment's element tree.
             st.session_state.lc_fig = _build_figure(
                 lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1, zoom_yaxis=zoom_yaxis
             )
@@ -403,19 +410,19 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
-        # Always render the chart at the same structural position regardless of
-        # recording state — this prevents Streamlit losing track of the widget
-        # when transitioning between the recording and idle branches.
+        # Always render the chart in its reserved slot.
         if st.session_state.lc_fig is not None:
-            st.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_chart")
+            chart_slot.plotly_chart(st.session_state.lc_fig, width="stretch")
         else:
-            empty_fig = _build_figure(
-                np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
+            chart_slot.plotly_chart(
+                _build_figure(
+                    np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
+                ),
+                width="stretch",
             )
-            st.plotly_chart(empty_fig, width="stretch", key="lc_chart")
 
         if st.session_state.image_bytes is not None:
-            st.download_button(
+            download_slot.download_button(
                 label="⬇ Download snapshot",
                 data=st.session_state.image_bytes,
                 file_name="lightcurve_snapshot.png",
