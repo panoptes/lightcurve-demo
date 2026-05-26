@@ -13,7 +13,9 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-TICK_MS: int = 40  # update interval in milliseconds (~25 fps)
+TICK_MS: int = (
+    100  # update interval in milliseconds (10 fps); must be ≥100 for st.fragment run_every
+)
 TICK_S: float = TICK_MS / 1000.0
 NORM_MAX: float = 100.0  # normalised light value at baseline
 
@@ -393,6 +395,10 @@ def main() -> None:
         if start_pressed and not st.session_state.lc_active:
             _reset_lc()
             st.session_state.lc_active = True
+            # Force a full rerun so the sidebar re-renders with the Start button
+            # disabled.  Without this, lc_active is set True *after* the button
+            # has already been rendered as enabled in the current script run.
+            st.rerun()
 
         if clear_pressed:
             st.session_state.lc_active = False
