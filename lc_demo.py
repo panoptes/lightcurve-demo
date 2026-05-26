@@ -353,15 +353,12 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
     with col_lc:
         st.subheader("Lightcurve")
 
-        # Reserve fixed DOM slots upfront so the element tree never changes shape
-        # regardless of recording state or which toggles are active.  Streamlit
-        # fragment reconciliation is sensitive to structural position changes;
-        # locking every dynamic element into its own st.empty() slot prevents the
-        # chart from flickering or disappearing when the caption or download button
-        # appears/disappears.
+        # caption_slot and download_slot are st.empty() containers that lock
+        # those two dynamic elements to fixed structural positions.  The chart
+        # itself sits directly between them as a plain st.plotly_chart() call —
+        # writing to an st.empty() container for a complex Plotly widget is
+        # unreliable inside rapidly auto-rerunning fragments.
         caption_slot = st.empty()
-        chart_slot = st.empty()
-        download_slot = st.empty()
 
         if st.session_state.lc_active and photometry is not None:
             # Pin max_ticks to the array allocated at recording start so that
@@ -410,17 +407,20 @@ def _live_view(radius: int, use_color: bool, save_image: bool, zoom_yaxis: bool)
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
-        # Always render the chart in its reserved slot.
-        if st.session_state.lc_fig is not None:
-            chart_slot.plotly_chart(st.session_state.lc_fig, width="stretch")
-        else:
-            chart_slot.plotly_chart(
-                _build_figure(
-                    np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
-                ),
-                width="stretch",
+        # Always render the chart at a stable structural position (between the
+        # caption_slot above and the download_slot below).  Never nest it inside
+        # an st.empty() container — writing a Plotly chart to an st.empty() is
+        # unreliable in fast auto-rerunning fragments.
+        fig = (
+            st.session_state.lc_fig
+            if st.session_state.lc_fig is not None
+            else _build_figure(
+                np.zeros((3, max_ticks)), max_ticks, lc_value, use_color, zoom_yaxis=zoom_yaxis
             )
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
+        download_slot = st.empty()
         if st.session_state.image_bytes is not None:
             download_slot.download_button(
                 label="⬇ Download snapshot",
