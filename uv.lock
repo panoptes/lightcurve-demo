@@ -411,7 +411,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "opencv-python", specifier = ">=4.8" },
     { name = "plotly", specifier = ">=5.20" },
-    { name = "streamlit", specifier = ">=1.35" },
+    { name = "streamlit", specifier = ">=1.37" },
 ]
 
 [package.metadata.requires-dev]

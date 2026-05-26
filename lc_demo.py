@@ -5,8 +5,6 @@ Point a webcam at a light source, click Start, and move a dark object in
 front of the light to see a real-time lightcurve appear in your browser.
 """
 
-import time
-
 import cv2
 import numpy as np
 import plotly.graph_objects as go
@@ -196,6 +194,92 @@ def _build_figure(lc_data: np.ndarray, max_ticks: int, lc_value: int, use_color:
 
 
 # ---------------------------------------------------------------------------
+# Live view fragment
+# ---------------------------------------------------------------------------
+
+
+@st.fragment(run_every=TICK_S)
+def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
+    """Camera acquisition and lightcurve display, auto-refreshed every TICK_S.
+
+    Running as a fragment means only this portion of the DOM is re-rendered
+    each tick; the sidebar and page chrome remain perfectly still.
+    """
+    lc_value: int = st.session_state.lc_value
+    max_ticks: int = int((lc_value * 1000) / TICK_MS)
+
+    col_cam, col_lc = st.columns([1, 2])
+
+    cap = _open_camera(st.session_state.video_device)
+    display, photometry = _get_frame(cap, radius, use_color)
+
+    with col_cam:
+        st.subheader("Webcam")
+        st.image(display, channels="RGB", width="stretch")
+
+    with col_lc:
+        st.subheader("Lightcurve")
+
+        if st.session_state.lc_active:
+            # Pin max_ticks to the array allocated at recording start so that
+            # changing the duration slider mid-recording cannot cause an IndexError.
+            lc = st.session_state.lc_data
+            max_ticks = lc.shape[1]
+            tick = st.session_state.tick_num
+
+            elapsed = tick * TICK_S
+            remaining = max(0.0, lc_value - elapsed)
+            st.caption(f"Recording… {remaining:.1f}s remaining")
+
+            r, g, b = _measure_flux(photometry, use_color)
+
+            # First tick — capture baseline
+            if tick == 0:
+                factor = [r if r > 0 else 1.0, g if g > 0 else 1.0, b if b > 0 else 1.0]
+                st.session_state.normal_factor = factor
+                if save_image:
+                    _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
+                    st.session_state.image_bytes = enc.tobytes()
+
+            # Midpoint snapshot
+            mid = max_ticks // 2
+            if save_image and tick == mid:
+                _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
+                st.session_state.image_bytes = enc.tobytes()
+
+            nr, ng, nb = _normalise(r, g, b, st.session_state.normal_factor)
+            lc[0, tick] = nr
+            lc[1, tick] = ng
+            lc[2, tick] = nb
+
+            fig = _build_figure(lc, max_ticks, lc_value, use_color)
+            st.plotly_chart(fig, width="stretch", key="lc_chart")
+
+            st.session_state.tick_num += 1
+
+            if st.session_state.tick_num >= max_ticks:
+                st.session_state.lc_active = False
+                st.session_state.lc_fig = fig
+                # Full rerun to restore the sidebar Start/Clear button states.
+                st.rerun()
+
+        else:
+            if st.session_state.lc_fig is not None:
+                st.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_chart")
+            else:
+                empty_fig = _build_figure(np.zeros((3, max_ticks)), max_ticks, lc_value, use_color)
+                st.plotly_chart(empty_fig, width="stretch", key="lc_chart")
+
+            if st.session_state.image_bytes is not None:
+                st.download_button(
+                    label="⬇ Download snapshot",
+                    data=st.session_state.image_bytes,
+                    file_name="lightcurve_snapshot.png",
+                    mime="image/png",
+                )
+
+
+# ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
 
@@ -278,98 +362,7 @@ def main() -> None:
             st.session_state.lc_active = False
             _reset_lc()
 
-    # ------------------------------------------------------------------
-    # Main area — two-column layout (webcam | lightcurve)
-    # ------------------------------------------------------------------
-    col_cam, col_lc = st.columns([1, 2])
-
-    with col_cam:
-        st.subheader("Webcam")
-        cam_placeholder = st.empty()
-
-    with col_lc:
-        st.subheader("Lightcurve")
-        if st.session_state.lc_active:
-            elapsed = st.session_state.tick_num * TICK_S
-            remaining = max(0.0, lc_value - elapsed)
-            st.caption(f"Recording… {remaining:.1f}s remaining")
-        lc_placeholder = st.empty()
-
-        if st.session_state.image_bytes is not None:
-            st.download_button(
-                label="⬇ Download snapshot",
-                data=st.session_state.image_bytes,
-                file_name="lightcurve_snapshot.png",
-                mime="image/png",
-            )
-
-    # ------------------------------------------------------------------
-    # Camera acquisition
-    # ------------------------------------------------------------------
-    cap = _open_camera(st.session_state.video_device)
-    display, photometry = _get_frame(cap, radius, use_color)
-    cam_placeholder.image(display, channels="RGB", width="stretch")
-
-    # ------------------------------------------------------------------
-    # Lightcurve logic
-    # ------------------------------------------------------------------
-    max_ticks = int((lc_value * 1000) / TICK_MS)
-
-    if st.session_state.lc_active:
-        # Pin max_ticks to the array allocated at recording start so that
-        # changing the duration slider mid-recording cannot cause an IndexError.
-        lc = st.session_state.lc_data
-        max_ticks = lc.shape[1]
-
-        tick = st.session_state.tick_num
-        r, g, b = _measure_flux(photometry, use_color)
-
-        # First tick — capture baseline
-        if tick == 0:
-            factor = [r if r > 0 else 1.0, g if g > 0 else 1.0, b if b > 0 else 1.0]
-            st.session_state.normal_factor = factor
-
-            # Optionally save a snapshot at start (will be overwritten at midpoint)
-            if save_image:
-                _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
-                st.session_state.image_bytes = enc.tobytes()
-
-        # Midpoint snapshot
-        mid = max_ticks // 2
-        if save_image and tick == mid:
-            _, enc = cv2.imencode(".png", cv2.cvtColor(display, cv2.COLOR_RGB2BGR))
-            st.session_state.image_bytes = enc.tobytes()
-
-        nr, ng, nb = _normalise(r, g, b, st.session_state.normal_factor)
-
-        lc[0, tick] = nr
-        lc[1, tick] = ng
-        lc[2, tick] = nb
-
-        # Build and display figure
-        fig = _build_figure(lc, max_ticks, lc_value, use_color)
-        lc_placeholder.plotly_chart(fig, width="stretch", key=f"lc_{tick}")
-
-        st.session_state.tick_num += 1
-
-        if st.session_state.tick_num >= max_ticks:
-            # Recording finished
-            st.session_state.lc_active = False
-            st.session_state.lc_fig = fig
-            st.rerun()
-        else:
-            time.sleep(TICK_S)
-            st.rerun()
-
-    else:
-        # Idle — keep the webcam live and show last figure or empty axes
-        if st.session_state.lc_fig is not None:
-            lc_placeholder.plotly_chart(st.session_state.lc_fig, width="stretch", key="lc_final")
-        else:
-            empty_fig = _build_figure(np.zeros((3, max_ticks)), max_ticks, lc_value, use_color)
-            lc_placeholder.plotly_chart(empty_fig, width="stretch", key="lc_empty")
-        time.sleep(TICK_S)
-        st.rerun()
+    _live_view(radius=radius, use_color=use_color, save_image=save_image)
 
 
 if __name__ == "__main__":
