@@ -30,6 +30,7 @@ def _init_state() -> None:
     """Initialise all session-state keys on first run."""
     defaults: dict[str, object] = {
         "lc_active": False,
+        "video_active": True,  # webcam feed running
         "lc_value": 10,  # total duration (seconds)
         "tick_num": 0,
         "lc_data": None,  # numpy array shape (3, max_ticks)
@@ -151,8 +152,22 @@ def _normalise(r: float, g: float, b: float, factor: list[float]) -> FluxTriple:
 # ---------------------------------------------------------------------------
 
 
-def _build_figure(lc_data: np.ndarray, max_ticks: int, lc_value: int, use_color: bool) -> go.Figure:
-    """Build a Plotly figure from the current lightcurve data."""
+def _build_figure(
+    lc_data: np.ndarray,
+    max_ticks: int,
+    lc_value: int,
+    use_color: bool,
+    filled_ticks: int | None = None,
+) -> go.Figure:
+    """Build a Plotly figure from the current lightcurve data.
+
+    filled_ticks — number of data points that have been written.  Only those
+                   points are plotted; the rest of the pre-allocated array
+                   (zeros) is intentionally omitted so the chart grows in
+                   real time instead of appearing blank.  Pass None (default)
+                   to plot the full array.
+    """
+    n = filled_ticks if filled_ticks is not None else max_ticks
     t = np.arange(max_ticks) * TICK_S
 
     fig = go.Figure()
@@ -162,8 +177,8 @@ def _build_figure(lc_data: np.ndarray, max_ticks: int, lc_value: int, use_color:
         for i, (color, name) in enumerate(zip(["red", "green", "blue"], ["R", "G", "B"])):
             fig.add_trace(
                 go.Scatter(
-                    x=t,
-                    y=lc_data[i],
+                    x=t[:n],
+                    y=lc_data[i, :n],
                     mode="lines",
                     name=name,
                     line={"color": color, "width": 2},
@@ -172,8 +187,8 @@ def _build_figure(lc_data: np.ndarray, max_ticks: int, lc_value: int, use_color:
     else:
         fig.add_trace(
             go.Scatter(
-                x=t,
-                y=lc_data[0],
+                x=t[:n],
+                y=lc_data[0, :n],
                 mode="lines+markers",
                 marker={"size": 4},
                 name="Flux",
@@ -210,17 +225,20 @@ def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
 
     col_cam, col_lc = st.columns([1, 2])
 
-    cap = _open_camera(st.session_state.video_device)
-    display, photometry = _get_frame(cap, radius, use_color)
-
     with col_cam:
         st.subheader("Webcam")
-        st.image(display, channels="RGB", width="stretch")
+        if st.session_state.video_active:
+            cap = _open_camera(st.session_state.video_device)
+            display, photometry = _get_frame(cap, radius, use_color)
+            st.image(display, channels="RGB", width="stretch")
+        else:
+            st.info("📷 Video stopped. Press **Start Video** in the sidebar to resume.")
+            photometry = None
 
     with col_lc:
         st.subheader("Lightcurve")
 
-        if st.session_state.lc_active:
+        if st.session_state.lc_active and photometry is not None:
             # Pin max_ticks to the array allocated at recording start so that
             # changing the duration slider mid-recording cannot cause an IndexError.
             lc = st.session_state.lc_data
@@ -252,14 +270,15 @@ def _live_view(radius: int, use_color: bool, save_image: bool) -> None:
             lc[1, tick] = ng
             lc[2, tick] = nb
 
-            fig = _build_figure(lc, max_ticks, lc_value, use_color)
+            # Plot only the filled portion so the chart grows in real time.
+            fig = _build_figure(lc, max_ticks, lc_value, use_color, filled_ticks=tick + 1)
             st.plotly_chart(fig, width="stretch", key="lc_chart")
 
             st.session_state.tick_num += 1
 
             if st.session_state.tick_num >= max_ticks:
                 st.session_state.lc_active = False
-                st.session_state.lc_fig = fig
+                st.session_state.lc_fig = _build_figure(lc, max_ticks, lc_value, use_color)
                 # Full rerun to restore the sidebar Start/Clear button states.
                 st.rerun()
 
@@ -304,17 +323,34 @@ def main() -> None:
 
         st.divider()
 
-        device = st.number_input(
-            "Video device index",
-            min_value=0,
-            max_value=9,
-            value=st.session_state.video_device,
-            step=1,
-            help="0 = /dev/video0, 1 = /dev/video1, …",
-        )
-        if device != st.session_state.video_device:
-            _release_camera()
-            st.session_state.video_device = device
+        # Video start/stop
+        if st.session_state.video_active:
+            if st.button("⏹ Stop Video", use_container_width=True):
+                _release_camera()
+                st.session_state.video_active = False
+                if st.session_state.lc_active:
+                    st.session_state.lc_active = False
+                    _reset_lc()
+        else:
+            if st.button("📷 Start Video", use_container_width=True):
+                st.session_state.video_active = True
+
+        # Device picker — collapsed in a popover to keep sidebar clean
+        device_label = f"📷 Device: /dev/video{st.session_state.video_device}"
+        with st.popover(device_label, use_container_width=True):
+            new_device = st.number_input(
+                "Video device index",
+                min_value=0,
+                max_value=9,
+                value=st.session_state.video_device,
+                step=1,
+                help="0 = /dev/video0, 1 = /dev/video1, …",
+            )
+            if new_device != st.session_state.video_device:
+                _release_camera()
+                st.session_state.video_device = new_device
+
+        st.divider()
 
         lc_value = st.slider(
             "Duration (seconds)",
@@ -345,7 +381,7 @@ def main() -> None:
             start_pressed = st.button(
                 "▶ Start",
                 use_container_width=True,
-                disabled=st.session_state.lc_active,
+                disabled=st.session_state.lc_active or not st.session_state.video_active,
             )
         with col_clear:
             clear_pressed = st.button(

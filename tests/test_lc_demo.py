@@ -175,6 +175,15 @@ class TestBuildFigure:
         # Each trace should have max_ticks x-values
         assert len(fig.data[0].x) == max_ticks
 
+    def test_filled_ticks_limits_plotted_points(self):
+        max_ticks = 100
+        filled = 30
+        fig = lc_demo._build_figure(
+            self._zeros(max_ticks), max_ticks, 10, use_color=True, filled_ticks=filled
+        )
+        # Only filled_ticks data points should appear in each trace
+        assert len(fig.data[0].x) == filled
+
     def test_data_reflected_in_traces(self):
         lc = np.zeros((3, 10))
         lc[0, 5] = 80.0  # R channel spike at tick 5
